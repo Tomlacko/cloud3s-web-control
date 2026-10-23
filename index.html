@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cloud III S Control</title>
+  <meta name="description" content="Configure a HyperX Cloud III S Wireless headset from the browser over WebHID, without NGENUITY.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23e5484d' d='M12 3a9 9 0 0 0-9 9v6a3 3 0 0 0 3 3h2v-8H5v-1a7 7 0 0 1 14 0v1h-3v8h2a3 3 0 0 0 3-3v-6a9 9 0 0 0-9-9z'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="app/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0-9 9v6a3 3 0 0 0 3 3h2v-8H5v-1a7 7 0 0 1 14 0v1h-3v8h2a3 3 0 0 0 3-3v-6a9 9 0 0 0-9-9z"/></svg>
+    <div>
+      <h1>Cloud III S Control</h1>
+      <p class="sub">HyperX Cloud III S Wireless · WebHID · no NGENUITY</p>
+    </div>
+  </div>
+  <div class="conn">
+    <span id="connPill" class="pill off">Not connected</span>
+    <label class="chk small" title="Lets you pick any HP / HyperX HID device, for experimenting">
+      <input type="checkbox" id="anyDevice"> any HP/HyperX device
+    </label>
+    <button id="btnConnect" class="primary">Connect</button>
+    <button id="btnDisconnect" disabled>Disconnect</button>
+    <button id="btnForget" class="ghost" disabled title="Revoke this page's permission for the device">Forget</button>
+  </div>
+</header>
+
+<div id="unsupported" class="banner error" hidden>
+  <strong>This browser has no WebHID.</strong>
+  Use a desktop Chromium browser (Chrome, Edge, Opera, Brave, Vivaldi) on Windows, macOS, Linux or ChromeOS.
+  Firefox and Safari don't implement WebHID — use the Python CLI in <code>python/</code> instead.
+</div>
+<div id="insecure" class="banner warn" hidden>
+  WebHID needs a secure web page and may refuse pages opened straight from disk. If <b>Connect</b> does nothing,
+  open the hosted version or serve this folder locally: run <code>python -m http.server</code> here and visit
+  <code>http://localhost:8000</code>.
+</div>
+<div id="hint" class="banner info">
+  Plug in the 2.4 GHz dongle, turn the headset on, then press <b>Connect</b> and pick
+  <i>HyperX Cloud III S Wireless</i>. Settings are written to the headset, so you only need to do this once.
+  Close NGENUITY first if it's running.
+</div>
+
+<main class="grid">
+
+  <!-- Status -->
+  <section class="card" id="cardStatus">
+    <div class="card-head">
+      <h2>Status</h2>
+      <div class="head-actions">
+        <label class="small">Poll
+          <select id="pollInterval">
+            <option value="0">off</option>
+            <option value="10">10 s</option>
+            <option value="30" selected>30 s</option>
+            <option value="60">60 s</option>
+          </select>
+        </label>
+        <button id="btnRefresh" class="small" disabled>Refresh all</button>
+      </div>
+    </div>
+    <div class="battery">
+      <div class="batt-bar"><div id="battFill"></div></div>
+      <div class="batt-text"><span id="stBattery" class="big">—</span><span id="stCharging" class="muted">—</span></div>
+    </div>
+    <dl class="kv">
+      <dt>Headset link</dt><dd id="stLink">—</dd>
+      <dt>Device</dt><dd id="stDevice">—</dd>
+      <dt>Color</dt><dd id="stColor">—</dd>
+      <dt>Mic boom</dt><dd id="stMicBoom" title="Raw value of opcode 0x43; meaning not confirmed">—</dd>
+      <dt>Headset info</dt><dd id="stInfo" class="mono" title="Raw reply of opcode 0x49 (format undocumented)">—</dd>
+    </dl>
+  </section>
+
+  <!-- Power -->
+  <section class="card" id="cardPower">
+    <div class="card-head">
+      <h2>Auto power-off</h2>
+      <button id="btnGetAutoOff" class="small" disabled>Read</button>
+    </div>
+    <p class="desc">
+      The headset counts down while it hears <b>silence</b> — quiet audio counts as silence, which is why it
+      switches off while you're still listening. <b>Never</b> turns the timer off completely.
+    </p>
+    <div class="current">On headset: <b id="stAutoOff">—</b></div>
+    <div class="seg" id="autoOffSeg" role="group" aria-label="Auto power-off">
+      <button data-sec="0">Never</button>
+      <button data-sec="600">10 min</button>
+      <button data-sec="1200">20 min</button>
+      <button data-sec="1800">30 min</button>
+    </div>
+    <details class="adv">
+      <summary>Custom timer (unofficial)</summary>
+      <p class="desc">
+        The firmware field is 16-bit seconds (0–65535, about 18 h). NGENUITY only ever sends the four values above,
+        so other values are untested — after applying, the read-back shows what the headset kept.
+      </p>
+      <div class="row">
+        <input type="number" id="autoOffCustom" aria-label="Custom auto power-off" min="0" max="65535" value="60" step="1">
+        <select id="autoOffUnit"><option value="60">minutes</option><option value="1">seconds</option></select>
+        <button id="btnAutoOffCustom" disabled>Apply</button>
+      </div>
+    </details>
+  </section>
+
+  <!-- Mic & monitoring -->
+  <section class="card" id="cardMic">
+    <div class="card-head">
+      <h2>Microphone &amp; monitoring</h2>
+      <button id="btnGetMic" class="small" disabled>Read</button>
+    </div>
+    <div class="toggle-row">
+      <div><b>Mic mute</b><span class="desc">Same as the mute button on the headset.</span></div>
+      <label class="switch"><input type="checkbox" id="tgMicMute" aria-label="Mic mute" disabled><span></span></label>
+    </div>
+    <div class="toggle-row">
+      <div><b>Sidetone</b><span class="desc">Hear your own voice in the headset ("mic monitoring").</span></div>
+      <label class="switch"><input type="checkbox" id="tgSidetone" aria-label="Sidetone" disabled><span></span></label>
+    </div>
+    <details class="adv" id="sidetoneLevelBox">
+      <summary>Sidetone level <span class="tag exp">experimental</span></summary>
+      <p class="desc">
+        Opcode 0x44/0x45 from NGENUITY 3's code (its UI doesn't show this slider yet). Signed value starting at −6.
+        May need recent headset firmware; if the read-back doesn't change, your firmware ignores it.
+      </p>
+      <div class="row">
+        <input type="range" id="slSidetoneLevel" aria-label="Sidetone level" min="-6" max="6" step="1" value="0" disabled>
+        <output id="outSidetoneLevel" class="mono">0</output>
+      </div>
+      <div class="row">
+        <label class="chk small"><input type="checkbox" id="sidetoneExt"> full range (−128…127)</label>
+        <span class="muted small">On headset: <b id="stSidetoneLevel">—</b></span>
+      </div>
+    </details>
+  </section>
+
+  <!-- Playback & prompts -->
+  <section class="card" id="cardPlayback">
+    <div class="card-head">
+      <h2>Playback &amp; prompts</h2>
+      <button id="btnGetPlayback" class="small" disabled>Read</button>
+    </div>
+    <div class="toggle-row">
+      <div><b>Voice prompts</b><span class="desc">Spoken "power on", "battery low", … announcements.</span></div>
+      <label class="switch"><input type="checkbox" id="tgVoicePrompt" aria-label="Voice prompts" disabled><span></span></label>
+    </div>
+    <div class="toggle-row">
+      <div><b>Playback mute</b> <span class="tag exp">experimental</span><span class="desc">Mutes the headset's speakers on the headset side.</span></div>
+      <label class="switch"><input type="checkbox" id="tgPlaybackMute" aria-label="Playback mute" disabled><span></span></label>
+    </div>
+    <div class="note">
+      <b>Noise cancellation?</b> The Cloud III S has no active noise cancellation, and neither NGENUITY version has a
+      noise-cancelling command for it. The mic's noise reduction is acoustic (built into the mic). The "noise suppression"
+      in NGENUITY 3 is PC-side processing in its own audio driver — without NGENUITY it simply isn't there.
+    </div>
+  </section>
+
+  <!-- EQ -->
+  <section class="card wide" id="cardEq">
+    <div class="card-head">
+      <h2>Equalizer <span class="muted small">(onboard, 10 bands)</span></h2>
+      <div class="head-actions">
+        <label class="chk small"><input type="checkbox" id="eqLive" checked> live</label>
+        <label class="chk small" title="NGENUITY 3's 'withDepop' flag: set on the last band when switching presets"><input type="checkbox" id="eqDepop" checked> de-pop</label>
+        <label class="chk small" title="NGENUITY 3 allows ±8 dB. Older tools used ±12 dB."><input type="checkbox" id="eqExt"> ±12 dB</label>
+      </div>
+    </div>
+    <p class="desc">The headset can't report its current EQ, so the curve shown is the last one this browser sent.</p>
+    <div class="eq" id="eqBands"></div>
+    <div class="row wrap">
+      <select id="eqPreset" aria-label="EQ presets"></select>
+      <button id="btnEqApply" disabled>Apply curve</button>
+      <button id="btnEqFlat">Flat</button>
+      <button id="btnEqSave">Save as…</button>
+      <button id="btnEqDelete" class="ghost">Delete preset</button>
+      <button id="btnEqExport" class="ghost">Export</button>
+      <label class="btn ghost">Import<input type="file" id="eqImport" accept="application/json" hidden></label>
+    </div>
+    <details class="adv">
+      <summary>Onboard EQ slot <span class="tag exp">experimental</span></summary>
+      <p class="desc">Opcodes 0x0F (set, 0–5) / 0x1C (get). Present in both NGENUITY versions but never used for this headset; meaning unconfirmed.</p>
+      <div class="row">
+        <select id="eqSlot" aria-label="Onboard EQ slot"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+        <button id="btnEqSlotSet" disabled>Set</button>
+        <button id="btnEqSlotGet" disabled>Read</button>
+        <span class="muted small">On headset: <b id="stEqSlot">—</b></span>
+      </div>
+    </details>
+  </section>
+
+  <!-- Raw console -->
+  <section class="card wide" id="cardRaw">
+    <div class="card-head"><h2>Raw console</h2><span class="tag">power user</span></div>
+    <div class="raw-grid">
+      <div>
+        <h3>Command (report 0x0C)</h3>
+        <div class="row wrap">
+          <label class="small">R/W
+            <select id="rawRw"><option value="1">GET (01)</option><option value="0">SET (00)</option></select>
+          </label>
+          <label class="small">Opcode <input id="rawOp" class="mono hex" value="06" maxlength="4"></label>
+          <label class="small grow">Args (hex) <input id="rawArgs" class="mono" placeholder="e.g. 01  or  04 B0"></label>
+        </div>
+        <div class="row wrap">
+          <select id="rawOpList" class="grow" aria-label="Known opcodes"></select>
+        </div>
+        <div class="preview mono" id="rawPreview"></div>
+        <div class="row wrap">
+          <button id="btnRawSend" disabled>Send command</button>
+          <label class="chk small"><input type="checkbox" id="rawFeature"> as feature report</label>
+        </div>
+        <h3>Any report</h3>
+        <div class="row wrap">
+          <label class="small">Report ID <input id="rawRid" class="mono hex" value="0C" maxlength="4"></label>
+          <label class="small grow">Data (hex, without ID) <input id="rawData" class="mono" placeholder="02 03 01 00 06"></label>
+        </div>
+        <div class="row wrap">
+          <button id="btnRawReport" disabled>Send output report</button>
+          <button id="btnRawFeature" disabled>Send feature report</button>
+          <button id="btnRawGetFeature" disabled>Read feature report</button>
+        </div>
+      </div>
+      <div>
+        <h3>Opcode scanner</h3>
+        <p class="desc">
+          Sends <code>GET</code> (byte 3 = 01) for every opcode in the range and lists what answers.
+          GETs should be read-only, but unknown opcodes are unknown — use at your own risk.
+        </p>
+        <div class="row wrap">
+          <label class="small">From <input id="scanFrom" class="mono hex" value="00"></label>
+          <label class="small">To <input id="scanTo" class="mono hex" value="7F"></label>
+          <label class="small">Timeout ms <input id="scanTimeout" type="number" value="250" min="50" max="3000" style="width:5em"></label>
+          <button id="btnScan" disabled>Scan</button>
+          <button id="btnScanStop" disabled>Stop</button>
+        </div>
+        <div class="scan-out"><table id="scanTable"><thead><tr><th>Op</th><th>Known as</th><th>Reply (bytes 6…)</th></tr></thead><tbody></tbody></table></div>
+        <h3>Device descriptor</h3>
+        <div class="scan-out small"><table id="colTable"><thead><tr><th>Usage page:usage</th><th>Input</th><th>Output</th><th>Feature</th></tr></thead><tbody></tbody></table></div>
+        <p class="muted small" id="transportInfo"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Log -->
+  <section class="card wide" id="cardLog">
+    <div class="card-head">
+      <h2>Event log</h2>
+      <div class="head-actions">
+        <label class="chk small"><input type="checkbox" id="logTx" checked> sent</label>
+        <label class="chk small"><input type="checkbox" id="logRx" checked> replies</label>
+        <label class="chk small"><input type="checkbox" id="logEv" checked> events</label>
+        <label class="chk small"><input type="checkbox" id="logHex"> hex</label>
+        <button id="btnLogCopy" class="small">Copy</button>
+        <button id="btnLogClear" class="small ghost">Clear</button>
+      </div>
+    </div>
+    <div id="log" class="log mono" aria-live="polite"></div>
+  </section>
+
+  <section class="card wide settings" id="cardSettings">
+    <details>
+      <summary>Settings &amp; troubleshooting</summary>
+      <div class="row wrap">
+        <label class="chk small"><input type="checkbox" id="autoConnect" checked> reconnect automatically when the page opens</label>
+        <label class="small">Reply timeout <input type="number" id="replyTimeout" value="1000" min="100" max="5000" style="width:5.5em"> ms</label>
+        <label class="small">SET wait <input type="number" id="ackTimeout" value="300" min="0" max="3000" style="width:5.5em"> ms</label>
+      </div>
+      <ul class="desc">
+        <li><b>Nothing answers / everything shows "—":</b> turn the headset on, make sure it's paired with the dongle
+          (status "Headset link"), and close NGENUITY. Unplug and replug the dongle if it stopped answering.</li>
+        <li><b>Linux:</b> install <code>linux/99-hyperx-cloud3s.rules</code> for permissions. Some kernels confuse the dongle on first
+          enumeration so it stops forwarding replies; see the README for the <code>usbcore.quirks</code> fix.</li>
+        <li><b>The headset must be on and in 2.4 GHz mode.</b> Over Bluetooth there's no control channel to the PC.</li>
+        <li>Spatial audio (DTS) and the volume sliders in NGENUITY are PC-side features, not headset settings — nothing to replicate here.</li>
+      </ul>
+    </details>
+  </section>
+</main>
+
+<footer>
+  Unofficial tool, not affiliated with HyperX or HP. Protocol recovered from NGENUITY Legacy 2.35 and NGENUITY 3.1 —
+  see <a href="docs/PROTOCOL.md">docs/PROTOCOL.md</a>.
+</footer>
+
+<script src="app/protocol.js"></script>
+<script src="app/transport.js"></script>
+<script src="app/app.js"></script>
+</body>
+</html>

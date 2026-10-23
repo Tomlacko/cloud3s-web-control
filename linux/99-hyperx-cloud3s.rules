@@ -1,0 +1,14 @@
+# HyperX Cloud III S Wireless: let the logged-in user talk to the dongle / headset
+# from the browser (WebHID) or the Python CLI (hidapi) without root.
+#
+# Install:
+#   sudo cp 99-hyperx-cloud3s.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+# then unplug and replug the dongle.
+
+# 2.4 GHz dongle, rev. 1 and rev. 2
+KERNEL=="hidraw*", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="06be", MODE="0660", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="02cc", MODE="0660", TAG+="uaccess"
+# Headset over USB-C, rev. 1 and rev. 2
+KERNEL=="hidraw*", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="05be", MODE="0660", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="03f0", ATTRS{idProduct}=="01cc", MODE="0660", TAG+="uaccess"

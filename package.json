@@ -1,0 +1,13 @@
+{
+  "name": "hyperx-cloud3s-control",
+  "private": true,
+  "license": "Unlicense",
+  "description": "Browser (WebHID) and CLI control for the HyperX Cloud III S Wireless, without NGENUITY",
+  "scripts": {
+    "test": "node tests/e2e.mjs && cd python && python3 -m unittest -q",
+    "serve": "python3 -m http.server 8000"
+  },
+  "devDependencies": {
+    "playwright": "^1.45.0"
+  }
+}
