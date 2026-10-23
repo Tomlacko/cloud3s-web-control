@@ -1,5 +1,8 @@
 # Cloud III S Control
 
+**Try it live: [tomlacko.github.io/cloud3s-web-control](https://tomlacko.github.io/cloud3s-web-control/)**
+— nothing to install, just plug in the dongle and open the page in Chrome or Edge.
+
 Configure a **HyperX Cloud III S Wireless** without NGENUITY — from a browser tab (WebHID) or
 from the command line (Python).
 
@@ -41,8 +44,8 @@ Works in desktop **Chrome, Edge, Opera, Brave, Vivaldi** on Windows, macOS, Linu
 Firefox and Safari don't support WebHID — use the Python CLI there.
 
 1. Open the page:
-   * **Hosted**: enable GitHub Pages for this repo (Settings → Pages → *Deploy from a branch*,
-     `main`, `/ (root)`), then open the URL GitHub shows.
+   * **Hosted**: <https://tomlacko.github.io/cloud3s-web-control/>
+     (in a fork: Settings → Pages → *Deploy from a branch*, `main`, `/ (root)`).
    * **Locally**: download the repo, run `python -m http.server` in its folder and open
      <http://localhost:8000>. (Opening `index.html` straight from disk may not be allowed to use
      WebHID.)
